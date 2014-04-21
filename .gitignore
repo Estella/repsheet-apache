@@ -68,3 +68,5 @@ cov-int
 librepsheet.tar.gz
 autom4te.cache
 dump.rdb
+build
+vendor

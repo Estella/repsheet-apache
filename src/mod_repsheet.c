@@ -6,6 +6,11 @@
 
 typedef struct {
   int repsheet_enabled;
+
+  const char *redis_host;
+  int redis_port;
+  int redis_timeout;
+
 } repsheet_config;
 
 static repsheet_config config;
@@ -23,9 +28,42 @@ const char *repsheet_set_enabled(cmd_parms *cmd, void *cfg, const char *arg)
   }
 }
 
+const char *repsheet_set_host(cmd_parms *cmd, void *cfg, const char *arg)
+{
+  config.redis_host = arg;
+  return NULL;
+}
+
+const char *repsheet_set_timeout(cmd_parms *cmd, void *cfg, const char *arg)
+{
+  int timeout = atoi(arg) * 1000;
+
+  if (timeout > 0) {
+    config.redis_timeout = timeout;
+    return NULL;
+  } else {
+    return "[ModRepsheet] - The RepsheetRedisTimeout directive must be a number";
+  }
+}
+
+const char *repsheet_set_port(cmd_parms *cmd, void *cfg, const char *arg)
+{
+  int port = atoi(arg);
+
+  if (port > 0) {
+    config.redis_port = port;
+    return NULL;
+  } else {
+    return "[ModRepsheet] - The RepsheetRedisPort directive must be a number";
+  }
+}
+
 static const command_rec repsheet_directives[] =
   {
-    AP_INIT_TAKE1("repsheetEnabled", repsheet_set_enabled, NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
+    AP_INIT_TAKE1("repsheetEnabled",      repsheet_set_enabled, NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
+    AP_INIT_TAKE1("repsheetRedisTimeout", repsheet_set_timeout, NULL, RSRC_CONF, "Set the Redis timeout"),
+    AP_INIT_TAKE1("repsheetRedisHost",    repsheet_set_host,    NULL, RSRC_CONF, "Set the Redis host"),
+    AP_INIT_TAKE1("repsheetRedisPort",    repsheet_set_port,    NULL, RSRC_CONF, "Set the Redis port"),
     { NULL }
   };
 
@@ -35,7 +73,7 @@ static int act(request_rec *r)
     return DECLINED;
   }
 
-  redisContext *context = get_redis_context("localhost", 6379, 5);
+  redisContext *context = get_redis_context((char*)config.redis_host, config.redis_port, config.redis_timeout);
 
   if (context == NULL) {
     return DECLINED;

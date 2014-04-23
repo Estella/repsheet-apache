@@ -2,6 +2,7 @@
 #include "http_log.h"
 
 #include "repsheet.h"
+#include "mod_repsheet.h"
 
 typedef struct {
   int repsheet_enabled;
@@ -63,8 +64,25 @@ static int act(request_rec *r)
   return DECLINED;
 }
 
+static int hook_post_config(apr_pool_t *mp, apr_pool_t *mp_log, apr_pool_t *mp_temp, server_rec *s) {
+  void *init_flag = NULL;
+  int first_time = 0;
+
+  apr_pool_userdata_get(&init_flag, "mod_repsheet-init-flag", s->process->pool);
+
+  if (init_flag == NULL) {
+    first_time = 1;
+    apr_pool_userdata_set((const void *)1, "mod_repsheet-init-flag", apr_pool_cleanup_null, s->process->pool);
+    ap_log_error(APLOG_MARK, APLOG_NOTICE | APLOG_NOERRNO, 0, s, "ModRepsheet for Apache %s (%s) loaded", REPSHEET_VERSION, REPSHEET_URL);
+    return OK;
+  }
+
+  return OK;
+}
+
 static void register_hooks(apr_pool_t *pool)
 {
+  ap_hook_post_config(hook_post_config, NULL, NULL, APR_HOOK_REALLY_LAST);
   ap_hook_post_read_request(act, NULL, NULL, APR_HOOK_LAST);
 }
 

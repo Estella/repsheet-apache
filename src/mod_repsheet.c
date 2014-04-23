@@ -47,6 +47,7 @@ static int act(request_rec *r)
 #endif
 
   if (is_whitelisted(context, actor_address)) {
+    redisFree(context);
     return DECLINED;
   } else if (is_blacklisted(context, actor_address)) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by the repsheet", actor_address);

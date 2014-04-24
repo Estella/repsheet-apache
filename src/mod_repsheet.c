@@ -6,6 +6,7 @@
 
 typedef struct {
   int repsheet_enabled;
+  int recorder_enabled;
 
   const char *redis_host;
   int redis_port;
@@ -27,6 +28,19 @@ const char *repsheet_set_enabled(cmd_parms *cmd, void *cfg, const char *arg)
     return NULL;
   } else {
     return "[ModRepsheet] - The RepsheetEnabled directive must be set to On or Off";
+  }
+}
+
+const char *repsheet_set_recorder_enabled(cmd_parms *cmd, void *cfg, const char *arg)
+{
+  if (strcasecmp(arg, "on") == 0) {
+    config.recorder_enabled = 1;
+    return NULL;
+  } else if (strcasecmp(arg, "off") == 0) {
+    config.recorder_enabled = 0;
+    return NULL;
+  } else {
+    return "[ModRepsheet] - The RepsheetRecorder directive must be set to On or Off";
   }
 }
 
@@ -81,6 +95,7 @@ const char *repsheet_set_redis_expiry(cmd_parms *cmd, void *cfg, const char *arg
 static const command_rec repsheet_directives[] =
   {
     AP_INIT_TAKE1("repsheetEnabled",        repsheet_set_enabled,          NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
+    AP_INIT_TAKE1("repsheetRecorder",       repsheet_set_recorder_enabled, NULL, RSRC_CONF, "Enable or disable repsheet recorder"),
     AP_INIT_TAKE1("repsheetRedisTimeout",   repsheet_set_timeout,          NULL, RSRC_CONF, "Set the Redis timeout"),
     AP_INIT_TAKE1("repsheetRedisHost",      repsheet_set_host,             NULL, RSRC_CONF, "Set the Redis host"),
     AP_INIT_TAKE1("repsheetRedisPort",      repsheet_set_port,             NULL, RSRC_CONF, "Set the Redis port"),
@@ -89,9 +104,9 @@ static const command_rec repsheet_directives[] =
     { NULL }
   };
 
-static int act(request_rec *r)
+static int act_and_record(request_rec *r)
 {
-  if (!ap_is_initial_req(r)) {
+  if (!config.repsheet_enabled || !ap_is_initial_req(r)) {
     return DECLINED;
   }
 
@@ -130,7 +145,9 @@ static int act(request_rec *r)
 	 r->method, r->uri, r->args, config.redis_max_length, config.redis_expiry,
 	 actor_address);
 
-  redisFree(context);
+  if (config.recorder_enabled) {
+    redisFree(context);
+  }
 
   return DECLINED;
 }
@@ -154,7 +171,7 @@ static int hook_post_config(apr_pool_t *mp, apr_pool_t *mp_log, apr_pool_t *mp_t
 static void register_hooks(apr_pool_t *pool)
 {
   ap_hook_post_config(hook_post_config, NULL, NULL, APR_HOOK_REALLY_LAST);
-  ap_hook_post_read_request(act, NULL, NULL, APR_HOOK_LAST);
+  ap_hook_post_read_request(act_and_record, NULL, NULL, APR_HOOK_LAST);
 }
 
 module AP_MODULE_DECLARE_DATA repsheet_module = {

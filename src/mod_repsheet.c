@@ -117,10 +117,14 @@ static int act_and_record(request_rec *r)
   }
 
 # if AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER == 4
-  char *actor_address = r->useragent_ip;
+  char *connected_address = r->useragent_ip;
 # else
-  char *actor_address = r->connection->remote_ip;
+  char *connected_address = r->connection->remote_ip;
 #endif
+
+  const char *xff_header = apr_table_get(r->headers_in, "X-Forwarded-For");
+
+  const char *actor_address = remote_address(connected_address, xff_header);
 
   if (is_whitelisted(context, actor_address)) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s is whitelisted by repsheet", actor_address);

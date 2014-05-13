@@ -146,12 +146,70 @@ static int act_and_record(request_rec *r)
   sprintf(timestamp, "%d/%d/%d %d:%d:%d.%d", (start.tm_mon + 1), start.tm_mday, (1900 + start.tm_year), start.tm_hour, start.tm_min, start.tm_sec, start.tm_usec);
 
   record(context, timestamp, apr_table_get(r->headers_in, "User-Agent"),
-	 r->method, r->uri, r->args, config.redis_max_length, config.redis_expiry,
-	 actor_address);
+         r->method, r->uri, r->args, config.redis_max_length, config.redis_expiry,
+         actor_address);
 
   if (config.recorder_enabled) {
     redisFree(context);
   }
+
+  return DECLINED;
+}
+
+static int process_mod_security(request_rec *r)
+{
+  if (!config.repsheet_enabled || !ap_is_initial_req(r)) {
+    return DECLINED;
+  }
+
+  redisContext *context = get_redis_context((char*)config.redis_host, config.redis_port, config.redis_timeout);
+
+  if (context == NULL) {
+    return DECLINED;
+  }
+
+  char *waf_events = (char *)apr_table_get(r->headers_in, "X-WAF-Events");
+
+  if (!waf_events) {
+    return DECLINED;
+  }
+
+  int i, m;
+  char **events;
+
+  m = matches(waf_events);
+
+  if (m > 0) {
+    events = malloc(m * sizeof(char*));
+    for(i = 0; i < m; i++) {
+      events[i] = malloc(i * sizeof(char));
+    }
+
+    process_mod_security_headers(waf_events, events);
+
+
+# if AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER == 4
+    char *connected_address = r->useragent_ip;
+# else
+    char *connected_address = r->connection->remote_ip;
+#endif
+
+    const char *xff_header = apr_table_get(r->headers_in, "X-Forwarded-For");
+    char *actor_address = (char*)remote_address(connected_address, xff_header);
+
+    for(i = 0; i < m; i++) {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "\n\n*********FOUND*********** %s\n\n", events[i]);
+      increment_rule_count(context, actor_address, events[i]);
+      mark_actor(context, actor_address);
+      if (config.redis_expiry > 0) {
+        expire(context, actor_address, "detected", config.redis_expiry);
+        expire(context, actor_address, "repsheet", config.redis_expiry);
+      }
+    }
+    free(events);
+  }
+
+  redisFree(context);
 
   return DECLINED;
 }
@@ -176,6 +234,7 @@ static void register_hooks(apr_pool_t *pool)
 {
   ap_hook_post_config(hook_post_config, NULL, NULL, APR_HOOK_REALLY_LAST);
   ap_hook_post_read_request(act_and_record, NULL, NULL, APR_HOOK_LAST);
+  ap_hook_fixups(process_mod_security, NULL, NULL, APR_HOOK_REALLY_LAST);
 }
 
 module AP_MODULE_DECLARE_DATA repsheet_module = {

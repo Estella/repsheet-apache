@@ -68,4 +68,45 @@ describe "Integration Specs" do
       @redis.lrange("8.8.8.8:requests", 0, -1).size.should == 1
     end
   end
+
+  describe "ModSecurity Integration" do
+    it "Creates the proper Redis keys when a security rule is triggered" do
+      Curl.get "http://127.0.0.1:8888?../../"
+
+      @redis.type("127.0.0.1:detected").should == "zset"
+      @redis.type("127.0.0.1:repsheet").should == "string"
+    end
+
+    it "Adds the offending IP address to the repsheet" do
+      @redis.get("127.0.0.1:repsheet").should be_false
+
+      Curl.get "http://127.0.0.1:8888?../../"
+
+      @redis.get("127.0.0.1:repsheet").should be_true
+    end
+
+    it "Properly sets and increments the waf events in <ip>:detected" do
+      Curl.get "http://127.0.0.1:8888?../../"
+
+      @redis.zscore("127.0.0.1:detected", "950103").should == 1.0
+      @redis.zscore("127.0.0.1:detected", "960009").should == 1.0
+      @redis.zscore("127.0.0.1:detected", "960017").should == 1.0
+
+      Curl.get "http://127.0.0.1:8888?../../"
+
+      @redis.zscore("127.0.0.1:detected", "950103").should == 2.0
+      @redis.zscore("127.0.0.1:detected", "960009").should == 2.0
+      @redis.zscore("127.0.0.1:detected", "960017").should == 2.0
+    end
+
+    it "Adds the offending IP address to the repsheet when behind a proxy" do
+      @redis.get("1.1.1.1:repsheet").should be_false
+
+      http = Curl.get("http://127.0.0.1:8888?../../") do |http|
+        http.headers['X-Forwarded-For'] = '1.1.1.1'
+      end
+
+      @redis.get("1.1.1.1:repsheet").should be_true
+    end
+  end
 end

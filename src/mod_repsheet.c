@@ -14,6 +14,8 @@ typedef struct {
   int redis_expiry;
   int redis_max_length;
 
+  int modsecurity_anomaly_threshold;
+
 } repsheet_config;
 
 static repsheet_config config;
@@ -92,15 +94,28 @@ const char *repsheet_set_redis_expiry(cmd_parms *cmd, void *cfg, const char *arg
   return NULL;
 }
 
+const char *repsheet_set_modsecurity_anomaly_threshold(cmd_parms *cmd, void *cfg, const char *arg)
+{
+  int threshold = strtol(arg, 0, 10);
+
+  if (threshold > 0) {
+    config.modsecurity_anomaly_threshold = threshold;
+    return NULL;
+  } else {
+    return "[ModRepsheet] - The ModSecurity anomaly threshold directive must be a number";
+  }
+}
+
 static const command_rec repsheet_directives[] =
   {
-    AP_INIT_TAKE1("repsheetEnabled",        repsheet_set_enabled,          NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
-    AP_INIT_TAKE1("repsheetRecorder",       repsheet_set_recorder_enabled, NULL, RSRC_CONF, "Enable or disable repsheet recorder"),
-    AP_INIT_TAKE1("repsheetRedisTimeout",   repsheet_set_timeout,          NULL, RSRC_CONF, "Set the Redis timeout"),
-    AP_INIT_TAKE1("repsheetRedisHost",      repsheet_set_host,             NULL, RSRC_CONF, "Set the Redis host"),
-    AP_INIT_TAKE1("repsheetRedisPort",      repsheet_set_port,             NULL, RSRC_CONF, "Set the Redis port"),
-    AP_INIT_TAKE1("repsheetRedisMaxLength", repsheet_set_redis_max_length, NULL, RSRC_CONF, "Last n requests kept per IP"),
-    AP_INIT_TAKE1("repsheetRedisExpiry",    repsheet_set_redis_expiry,     NULL, RSRC_CONF, "Number of hours before records expire"),
+    AP_INIT_TAKE1("repsheetEnabled",          repsheet_set_enabled,                       NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
+    AP_INIT_TAKE1("repsheetRecorder",         repsheet_set_recorder_enabled,              NULL, RSRC_CONF, "Enable or disable repsheet recorder"),
+    AP_INIT_TAKE1("repsheetRedisTimeout",     repsheet_set_timeout,                       NULL, RSRC_CONF, "Set the Redis timeout"),
+    AP_INIT_TAKE1("repsheetRedisHost",        repsheet_set_host,                          NULL, RSRC_CONF, "Set the Redis host"),
+    AP_INIT_TAKE1("repsheetRedisPort",        repsheet_set_port,                          NULL, RSRC_CONF, "Set the Redis port"),
+    AP_INIT_TAKE1("repsheetRedisMaxLength",   repsheet_set_redis_max_length,              NULL, RSRC_CONF, "Last n requests kept per IP"),
+    AP_INIT_TAKE1("repsheetRedisExpiry",      repsheet_set_redis_expiry,                  NULL, RSRC_CONF, "Number of hours before records expire"),
+    AP_INIT_TAKE1("repsheetAnomalyThreshold", repsheet_set_modsecurity_anomaly_threshold, NULL, RSRC_CONF, "Set block threshold"),
     { NULL }
   };
 
@@ -168,6 +183,24 @@ static int process_mod_security(request_rec *r)
     return DECLINED;
   }
 
+# if AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER == 4
+  char *connected_address = r->useragent_ip;
+# else
+  char *connected_address = r->connection->remote_ip;
+#endif
+
+  const char *xff_header = apr_table_get(r->headers_in, "X-Forwarded-For");
+  char *actor_address = (char*)remote_address(connected_address, xff_header);
+
+  char *x_waf_score = (char *)apr_table_get(r->headers_in, "X-WAF-Score");
+  int anomaly_score = modsecurity_total(x_waf_score);
+  if (anomaly_score >= config.modsecurity_anomaly_threshold) {
+    blacklist_and_expire(context, actor_address, config.redis_expiry, "ModSecurity Anomaly Threshold");
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blacklisted by Repsheet. ModSecurity anomaly score was %d", actor_address, anomaly_score);
+    redisFree(context);
+    return HTTP_FORBIDDEN;
+  }
+
   char *waf_events = (char *)apr_table_get(r->headers_in, "X-WAF-Events");
 
   if (!waf_events) {
@@ -187,18 +220,7 @@ static int process_mod_security(request_rec *r)
 
     process_mod_security_headers(waf_events, events);
 
-
-# if AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER == 4
-    char *connected_address = r->useragent_ip;
-# else
-    char *connected_address = r->connection->remote_ip;
-#endif
-
-    const char *xff_header = apr_table_get(r->headers_in, "X-Forwarded-For");
-    char *actor_address = (char*)remote_address(connected_address, xff_header);
-
     for(i = 0; i < m; i++) {
-      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "\n\n*********FOUND*********** %s\n\n", events[i]);
       increment_rule_count(context, actor_address, events[i]);
       mark_actor(context, actor_address);
       if (config.redis_expiry > 0) {

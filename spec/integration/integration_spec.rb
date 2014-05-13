@@ -108,5 +108,20 @@ describe "Integration Specs" do
 
       @redis.get("1.1.1.1:repsheet").should be_true
     end
+
+    it "Blocks requests that exceed the anomaly threshold" do
+      Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################").response_code.should == 403
+    end
+
+    it "Blacklists actors that exceed the anomaly threshold" do
+      Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
+      @redis.get("127.0.0.1:repsheet:blacklist").should be_true
+    end
+
+    it "Sets a reason when blacklisting actors that exceed the anomaly threshold" do
+      Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
+      @redis.get("127.0.0.1:repsheet:blacklist:reason").should == "ModSecurity Anomaly Threshold"
+    end
+
   end
 end

@@ -11,6 +11,7 @@ configure_repsheet () {
   RepsheetRedisPort 6379
   RepsheetRedisMaxLength 2
   RepsheetRedisExpiry 24
+  RepsheetAnomalyThreshold 20
 </IfModule>
 EOF
         printf "."

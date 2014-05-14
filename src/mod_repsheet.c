@@ -119,6 +119,19 @@ static const command_rec repsheet_directives[] =
     { NULL }
   };
 
+static const char *actor_address(request_rec *r)
+{
+# if AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER == 4
+  char *connected_address = r->useragent_ip;
+# else
+  char *connected_address = r->connection->remote_ip;
+#endif
+
+  const char *xff_header = apr_table_get(r->headers_in, "X-Forwarded-For");
+
+  return remote_address(connected_address, xff_header);
+}
+
 static int act_and_record(request_rec *r)
 {
   if (!config.repsheet_enabled || !ap_is_initial_req(r)) {
@@ -131,26 +144,18 @@ static int act_and_record(request_rec *r)
     return DECLINED;
   }
 
-# if AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER == 4
-  char *connected_address = r->useragent_ip;
-# else
-  char *connected_address = r->connection->remote_ip;
-#endif
+  const char *address = actor_address(r);
 
-  const char *xff_header = apr_table_get(r->headers_in, "X-Forwarded-For");
-
-  const char *actor_address = remote_address(connected_address, xff_header);
-
-  if (is_whitelisted(context, actor_address)) {
-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s is whitelisted by repsheet", actor_address);
+  if (is_whitelisted(context, address)) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s is whitelisted by repsheet", address);
     redisFree(context);
     return DECLINED;
-  } else if (is_blacklisted(context, actor_address)) {
-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", actor_address);
+  } else if (is_blacklisted(context, address)) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", address);
     redisFree(context);
     return HTTP_FORBIDDEN;
-  } else if (is_on_repsheet(context, actor_address)) {
-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was found on repsheet. No action taken", actor_address);
+  } else if (is_on_repsheet(context, address)) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was found on repsheet. No action taken", address);
     apr_table_set(r->headers_in, "X-Repsheet", "true");
   }
 
@@ -162,7 +167,7 @@ static int act_and_record(request_rec *r)
 
   record(context, timestamp, apr_table_get(r->headers_in, "User-Agent"),
          r->method, r->uri, r->args, config.redis_max_length, config.redis_expiry,
-         actor_address);
+         address);
 
   if (config.recorder_enabled) {
     redisFree(context);
@@ -183,20 +188,13 @@ static int process_mod_security(request_rec *r)
     return DECLINED;
   }
 
-# if AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER == 4
-  char *connected_address = r->useragent_ip;
-# else
-  char *connected_address = r->connection->remote_ip;
-#endif
-
-  const char *xff_header = apr_table_get(r->headers_in, "X-Forwarded-For");
-  char *actor_address = (char*)remote_address(connected_address, xff_header);
+  char *address = (char*)actor_address(r);
 
   char *x_waf_score = (char *)apr_table_get(r->headers_in, "X-WAF-Score");
   int anomaly_score = modsecurity_total(x_waf_score);
   if (anomaly_score >= config.modsecurity_anomaly_threshold) {
-    blacklist_and_expire(context, actor_address, config.redis_expiry, "ModSecurity Anomaly Threshold");
-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blacklisted by Repsheet. ModSecurity anomaly score was %d", actor_address, anomaly_score);
+    blacklist_and_expire(context, address, config.redis_expiry, "ModSecurity Anomaly Threshold");
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blacklisted by Repsheet. ModSecurity anomaly score was %d", address, anomaly_score);
     redisFree(context);
     return HTTP_FORBIDDEN;
   }
@@ -221,11 +219,11 @@ static int process_mod_security(request_rec *r)
     process_mod_security_headers(waf_events, events);
 
     for(i = 0; i < m; i++) {
-      increment_rule_count(context, actor_address, events[i]);
-      mark_actor(context, actor_address);
+      increment_rule_count(context, address, events[i]);
+      mark_actor(context, address);
       if (config.redis_expiry > 0) {
-        expire(context, actor_address, "detected", config.redis_expiry);
-        expire(context, actor_address, "repsheet", config.redis_expiry);
+        expire(context, address, "detected", config.redis_expiry);
+        expire(context, address, "repsheet", config.redis_expiry);
       }
     }
     free(events);

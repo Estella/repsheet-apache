@@ -35,11 +35,11 @@ install_apache () {
             --enable-proxy-connect                    \
             --enable-proxy-http                       \
             --enable-proxy-ftp                        \
-            --enable-dbd > install.log 2>&1
+            --enable-dbd # > install.log 2>&1
         printf "."
-        make >> install.log 2>&1
+        make # >> install.log 2>&1
         printf "."
-        make install >> install.log 2>&1
+        make install # >> install.log 2>&1
         printf "."
         popd > /dev/null 2>&1
         popd > /dev/null 2>&1

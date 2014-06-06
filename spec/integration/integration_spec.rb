@@ -10,11 +10,12 @@ describe "Integration Specs" do
 
   describe "Bootstrap" do
     it "Redis is running" do
-      @redis.ping.should == "PONG"
+      expect(@redis.ping).to eq("PONG")
     end
 
     it "Webserver is running" do
-      Curl.get("http://127.0.0.1:8888").response_code.should == 200
+      http = Curl.get("http://127.0.0.1:8888")
+      expect(http.response_code).to eq(200)
     end
   end
 
@@ -22,7 +23,7 @@ describe "Integration Specs" do
     it "Records the IP, User Agent, Method, URI, and Arguments during a request" do
       Curl.get "http://127.0.0.1:8888"
 
-      @redis.llen("127.0.0.1:requests").should == 1
+      expect(@redis.llen("127.0.0.1:requests")).to eq(1)
     end
 
     it "Properly sets the expiry" do
@@ -36,20 +37,20 @@ describe "Integration Specs" do
         http.headers['X-Forwarded-For'] = '1.1.1.1'
       end
 
-      @redis.llen("1.1.1.1:requests").should == 1
+      expect(@redis.llen("1.1.1.1:requests")).to eq(1)
     end
   end
 
   describe "Actions" do
     it "Returns a 403 response if the actor is on the blacklist" do
       @redis.set("127.0.0.1:repsheet:blacklist", "true")
-      Curl.get("http://127.0.0.1:8888").response_code.should == 403
+      expect(Curl.get("http://127.0.0.1:8888").response_code).to eq(403)
     end
 
     it "Returns a 200 response if the actor is on the whitelist" do
       @redis.set("127.0.0.1:repsheet:blacklist", "true")
       @redis.set("127.0.0.1:repsheet:whitelist", "true")
-      Curl.get("http://127.0.0.1:8888").response_code.should == 200
+      expect(Curl.get("http://127.0.0.1:8888").response_code).to eq(200)
     end
   end
 
@@ -58,14 +59,14 @@ describe "Integration Specs" do
       http = Curl.get("http://127.0.0.1:8888?../../") do |http|
         http.headers['X-Forwarded-For'] = '8.8.8.8, 12.34.56.78, 98.76.54.32'
       end
-      @redis.lrange("8.8.8.8:requests", 0, -1).size.should == 1
+      expect(@redis.lrange("8.8.8.8:requests", 0, -1).size).to eq(1)
     end
 
     it "Ignores user submitted noise in X-Forwarded-For" do
       http = Curl.get("http://127.0.0.1:8888?../../") do |http|
         http.headers['X-Forwarded-For'] = '\x5000 8.8.8.8, 12.34.56.78, 98.76.54.32'
       end
-      @redis.lrange("8.8.8.8:requests", 0, -1).size.should == 1
+      expect(@redis.lrange("8.8.8.8:requests", 0, -1).size).to eq(1)
     end
   end
 
@@ -73,54 +74,55 @@ describe "Integration Specs" do
     it "Creates the proper Redis keys when a security rule is triggered" do
       Curl.get "http://127.0.0.1:8888?../../"
 
-      @redis.type("127.0.0.1:detected").should == "zset"
-      @redis.type("127.0.0.1:repsheet").should == "string"
+      expect(@redis.type("127.0.0.1:detected")).to eq("zset")
+      expect(@redis.type("127.0.0.1:repsheet")).to eq("string")
     end
 
     it "Adds the offending IP address to the repsheet" do
-      @redis.get("127.0.0.1:repsheet").should be_false
+      expect(@redis.get("127.0.0.1:repsheet")).to eq(nil)
 
       Curl.get "http://127.0.0.1:8888?../../"
 
-      @redis.get("127.0.0.1:repsheet").should be_true
+      expect(@redis.get("127.0.0.1:repsheet")).to eq("true")
     end
 
     it "Properly sets and increments the waf events in <ip>:detected" do
       Curl.get "http://127.0.0.1:8888?../../"
 
-      @redis.zscore("127.0.0.1:detected", "950103").should == 1.0
-      @redis.zscore("127.0.0.1:detected", "960009").should == 1.0
-      @redis.zscore("127.0.0.1:detected", "960017").should == 1.0
+      expect(@redis.zscore("127.0.0.1:detected", "950103")).to eq(1.0)
+      expect(@redis.zscore("127.0.0.1:detected", "960009")).to eq(1.0)
+      expect(@redis.zscore("127.0.0.1:detected", "960017")).to eq(1.0)
 
       Curl.get "http://127.0.0.1:8888?../../"
 
-      @redis.zscore("127.0.0.1:detected", "950103").should == 2.0
-      @redis.zscore("127.0.0.1:detected", "960009").should == 2.0
-      @redis.zscore("127.0.0.1:detected", "960017").should == 2.0
+      expect(@redis.zscore("127.0.0.1:detected", "950103")).to eq(2.0)
+      expect(@redis.zscore("127.0.0.1:detected", "960009")).to eq(2.0)
+      expect(@redis.zscore("127.0.0.1:detected", "960017")).to eq(2.0)
     end
 
     it "Adds the offending IP address to the repsheet when behind a proxy" do
-      @redis.get("1.1.1.1:repsheet").should be_false
+      expect(@redis.get("1.1.1.1:repsheet")).to eq(nil)
 
       http = Curl.get("http://127.0.0.1:8888?../../") do |http|
         http.headers['X-Forwarded-For'] = '1.1.1.1'
       end
 
-      @redis.get("1.1.1.1:repsheet").should be_true
+      expect(@redis.get("1.1.1.1:repsheet")).to eq("true")
     end
 
     it "Blocks requests that exceed the anomaly threshold" do
-      Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################").response_code.should == 403
+      http = Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
+      expect(http.response_code).to eq(403)
     end
 
     it "Blacklists actors that exceed the anomaly threshold" do
       Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
-      @redis.get("127.0.0.1:repsheet:blacklist").should be_true
+      expect(@redis.get("127.0.0.1:repsheet:blacklist")).to eq("true")
     end
 
     it "Sets a reason when blacklisting actors that exceed the anomaly threshold" do
       Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
-      @redis.get("127.0.0.1:repsheet:blacklist:reason").should == "ModSecurity Anomaly Threshold"
+      expect(@redis.get("127.0.0.1:repsheet:blacklist:reason")).to eq("ModSecurity Anomaly Threshold")
     end
 
   end

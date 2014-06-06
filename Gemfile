@@ -1,5 +1,8 @@
 source 'https://rubygems.org'
 
-gem "rspec"
-gem "redis"
-gem "curb"
+group :development, :test do
+  gem "rake"
+  gem "rspec"
+  gem "redis"
+  gem "curb"
+end

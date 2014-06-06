@@ -10,5 +10,7 @@ sudo ldconfig
 pkg-config --list-all
 cd ..
 script/bootstrap
+./autogen.sh
+./configure
 bundle install
 bundle exec rake

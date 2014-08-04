@@ -236,7 +236,7 @@ static void register_hooks(apr_pool_t *pool)
 {
   /* ap_hook_post_config(hook_post_config, NULL, NULL, APR_HOOK_REALLY_LAST); */
   ap_hook_post_read_request(act_and_record, NULL, NULL, APR_HOOK_LAST);
-  /* ap_hook_fixups(process_mod_security, NULL, NULL, APR_HOOK_REALLY_LAST); */
+  ap_hook_fixups(process_mod_security, NULL, NULL, APR_HOOK_REALLY_LAST);
 }
 
 module AP_MODULE_DECLARE_DATA repsheet_module = {

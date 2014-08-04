@@ -7,13 +7,13 @@ source script/apache/repsheet.sh
 DIR=$(pwd)
 BUILDDIR=$DIR/build
 APACHE_24_DIR=apache24
-APACHE_24_VERSION=2.4.9
+APACHE_24_VERSION=2.4.10
 
 install_apache () {
     if [ ! -d "vendor/httpd-$APACHE_24_VERSION" ]; then
         printf "$BLUE * $YELLOW Installing Apache $APACHE_24_VERSION$RESET "
         pushd vendor > /dev/null 2>&1
-        curl -s -O http://mirror.symnds.com/software/Apache//httpd/httpd-2.4.9.tar.gz
+        curl -s -O http://supergsego.com/apache//httpd/httpd-2.4.10.tar.gz
         tar xzf httpd-$APACHE_24_VERSION.tar.gz
         printf "."
         pushd httpd-$APACHE_24_VERSION > /dev/null 2>&1

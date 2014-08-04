@@ -18,6 +18,7 @@ typedef struct {
   int redis_timeout;
   int redis_expiry;
   int redis_max_length;
+  redisContext *redis_connection;
 
   int modsecurity_anomaly_threshold;
 

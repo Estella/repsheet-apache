@@ -114,22 +114,38 @@ static const char *actor_address(request_rec *r)
   return remote_address(connected_address, xff_header);
 }
 
+static int reset_connection(request_rec *r)
+{
+  redisContext *context = get_redis_context((char*)config.redis_host, config.redis_port, config.redis_timeout);
+
+  if (context == NULL) {
+    return DECLINED;
+  } else {
+    config.redis_connection = context;
+    return OK;
+  }
+}
+
 static int act_and_record(request_rec *r)
 {
   if (!config.repsheet_enabled || !ap_is_initial_req(r)) {
     return DECLINED;
   }
 
-  redisContext *context = get_redis_context((char*)config.redis_host, config.redis_port, config.redis_timeout);
-
-  if (context == NULL) {
-    return DECLINED;
+  int connection_status = check_connection(config.redis_connection);
+  if (connection_status == DISCONNECTED) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "No Redis connection found, creating a new connection");
+    connection_status = reset_connection(r);
+    if (connection_status == DECLINED) {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "Unable to establish connection to Redis, bypassing further operations");
+      return DECLINED;
+    }
   }
 
   const char *address = actor_address(r);
 
   int ip_status = OK;
-  ip_status = actor_status(context, address, IP);
+  ip_status = actor_status(config.redis_connection, address, IP);
 
   if (ip_status == DISCONNECTED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "The Redis request failed, bypassing further operations");
@@ -138,11 +154,9 @@ static int act_and_record(request_rec *r)
 
   if (ip_status == WHITELISTED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s is whitelisted by repsheet", address);
-    redisFree(context);
     return DECLINED;
   } else if (ip_status == BLACKLISTED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", address);
-    redisFree(context);
     return HTTP_FORBIDDEN;
   } else if (ip_status == MARKED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was found on repsheet. No action taken", address);
@@ -155,13 +169,9 @@ static int act_and_record(request_rec *r)
   apr_time_exp_gmt(&start, r->request_time);
   sprintf(timestamp, "%d/%d/%d %d:%d:%d.%d", (start.tm_mon + 1), start.tm_mday, (1900 + start.tm_year), start.tm_hour, start.tm_min, start.tm_sec, start.tm_usec);
 
-  record(context, timestamp, apr_table_get(r->headers_in, "User-Agent"),
+  record(config.redis_connection, timestamp, apr_table_get(r->headers_in, "User-Agent"),
          r->method, r->uri, r->args, config.redis_max_length, config.redis_expiry,
          address);
-
-  if (config.recorder_enabled) {
-    redisFree(context);
-  }
 
   return DECLINED;
 }
@@ -172,10 +182,14 @@ static int process_mod_security(request_rec *r)
     return DECLINED;
   }
 
-  redisContext *context = get_redis_context((char*)config.redis_host, config.redis_port, config.redis_timeout);
-
-  if (context == NULL) {
-    return DECLINED;
+  int connection_status = check_connection(config.redis_connection);
+  if (connection_status == DISCONNECTED) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "No Redis connection found, creating a new connection");
+    connection_status = reset_connection(r);
+    if (connection_status == DECLINED) {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "Unable to establish connection to Redis, bypassing further operations");
+      return DECLINED;
+    }
   }
 
   char *address = (char*)actor_address(r);
@@ -183,9 +197,8 @@ static int process_mod_security(request_rec *r)
   char *x_waf_score = (char *)apr_table_get(r->headers_in, "X-WAF-Score");
   int anomaly_score = modsecurity_total(x_waf_score);
   if (anomaly_score >= config.modsecurity_anomaly_threshold) {
-    blacklist_and_expire(context, address, config.redis_expiry, "ModSecurity Anomaly Threshold");
+    blacklist_and_expire(config.redis_connection, address, config.redis_expiry, "ModSecurity Anomaly Threshold");
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blacklisted by Repsheet. ModSecurity anomaly score was %d", address, anomaly_score);
-    redisFree(context);
     return HTTP_FORBIDDEN;
   }
 
@@ -209,17 +222,15 @@ static int process_mod_security(request_rec *r)
     process_mod_security_headers(waf_events, events);
 
     for(i = 0; i < m; i++) {
-      increment_rule_count(context, address, events[i]);
-      mark_actor(context, address, IP);
+      increment_rule_count(config.redis_connection, address, events[i]);
+      mark_actor(config.redis_connection, address, IP);
       if (config.redis_expiry > 0) {
-        expire(context, address, "detected", config.redis_expiry);
-        expire(context, address, "repsheet", config.redis_expiry);
+        expire(config.redis_connection, address, "detected", config.redis_expiry);
+        expire(config.redis_connection, address, "repsheet", config.redis_expiry);
       }
     }
     free(events);
   }
-
-  redisFree(context);
 
   return DECLINED;
 }

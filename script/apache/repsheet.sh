@@ -12,6 +12,7 @@ configure_repsheet () {
   RepsheetRedisMaxLength 2
   RepsheetRedisExpiry 24
   RepsheetAnomalyThreshold 20
+  RepsheetUserCookie user
 </IfModule>
 EOF
         printf "."

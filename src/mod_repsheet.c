@@ -88,6 +88,12 @@ const char *repsheet_set_modsecurity_anomaly_threshold(cmd_parms *cmd, void *cfg
   }
 }
 
+const char *repsheet_set_user_cookie(cmd_parms *cmd, void *cfg, const char *arg)
+{
+  config.user_cookie = arg;
+  return NULL;
+}
+
 static const command_rec repsheet_directives[] =
   {
     AP_INIT_TAKE1("repsheetEnabled",          repsheet_set_enabled,                       NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
@@ -98,6 +104,7 @@ static const command_rec repsheet_directives[] =
     AP_INIT_TAKE1("repsheetRedisMaxLength",   repsheet_set_redis_max_length,              NULL, RSRC_CONF, "Last n requests kept per IP"),
     AP_INIT_TAKE1("repsheetRedisExpiry",      repsheet_set_redis_expiry,                  NULL, RSRC_CONF, "Number of hours before records expire"),
     AP_INIT_TAKE1("repsheetAnomalyThreshold", repsheet_set_modsecurity_anomaly_threshold, NULL, RSRC_CONF, "Set block threshold"),
+    AP_INIT_TAKE1("repsheetUserCookie",       repsheet_set_user_cookie,                   NULL, RSRC_CONF, "Set user cookie"),
     { NULL }
   };
 
@@ -142,9 +149,17 @@ static int act_and_record(request_rec *r)
     }
   }
 
-  const char *address = actor_address(r);
+  int user_status = OK;
+  const char *cookie_value = NULL;
+  ap_cookie_read(r, "user", &cookie_value, 0);
+  if (cookie_value) {
+    user_status = actor_status(config.redis_connection, cookie_value, USER);
+  } else {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "Could not locate %s cookie", config.user_cookie);
+  }
 
   int ip_status = OK;
+  const char *address = actor_address(r);
   ip_status = actor_status(config.redis_connection, address, IP);
 
   if (ip_status == DISCONNECTED) {
@@ -155,11 +170,24 @@ static int act_and_record(request_rec *r)
   if (ip_status == WHITELISTED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s is whitelisted by repsheet", address);
     return DECLINED;
-  } else if (ip_status == BLACKLISTED) {
+  } else if (user_status == WHITELISTED) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s is whitelisted by repsheet", cookie_value);
+    return DECLINED;
+  }
+
+  if (ip_status == BLACKLISTED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", address);
     return HTTP_FORBIDDEN;
-  } else if (ip_status == MARKED) {
+  } else if (user_status == BLACKLISTED) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", cookie_value);
+    return HTTP_FORBIDDEN;
+  }
+
+  if (ip_status == MARKED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was found on repsheet. No action taken", address);
+    apr_table_set(r->headers_in, "X-Repsheet", "true");
+  } else if (user_status == MARKED) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was found on repsheet. No action taken", cookie_value);
     apr_table_set(r->headers_in, "X-Repsheet", "true");
   }
 

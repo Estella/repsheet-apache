@@ -22,6 +22,8 @@ typedef struct {
 
   int modsecurity_anomaly_threshold;
 
+  const char *user_cookie;
+
 } repsheet_config;
 
 #endif

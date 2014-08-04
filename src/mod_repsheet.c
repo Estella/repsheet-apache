@@ -128,15 +128,23 @@ static int act_and_record(request_rec *r)
 
   const char *address = actor_address(r);
 
-  if (is_ip_whitelisted(context, address)) {
+  int ip_status = OK;
+  ip_status = actor_status(context, address, IP);
+
+  if (ip_status == DISCONNECTED) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "The Redis request failed, bypassing further operations");
+    return DECLINED;
+  }
+
+  if (ip_status == WHITELISTED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s is whitelisted by repsheet", address);
     redisFree(context);
     return DECLINED;
-  } else if (is_ip_blacklisted(context, address)) {
+  } else if (ip_status == BLACKLISTED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", address);
     redisFree(context);
     return HTTP_FORBIDDEN;
-  } else if (is_ip_marked(context, address)) {
+  } else if (ip_status == MARKED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was found on repsheet. No action taken", address);
     apr_table_set(r->headers_in, "X-Repsheet", "true");
   }

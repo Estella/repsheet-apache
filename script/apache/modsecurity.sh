@@ -11,11 +11,11 @@ install_mod_security () {
         ./configure --prefix=$BUILDDIR/$APACHE_24_DIR \
             --exec-prefix=$BUILDDIR/$APACHE_24_DIR    \
             --libdir=$BUILDDIR/$APACHE_24_DIR/lib     \
-            --with-apxs=$BUILDDIR/$APACHE_24_DIR/bin/apxs > install.log 2>&1
+            --with-apxs=$BUILDDIR/$APACHE_24_DIR/bin/apxs #> install.log 2>&1
         printf "."
-        make >> install.log 2>&1
+        make #>> install.log 2>&1
         printf "."
-        make install >> install.log 2>&1
+        make install #>> install.log 2>&1
         printf "."
         popd > /dev/null 2>&1
         popd > /dev/null 2>&1

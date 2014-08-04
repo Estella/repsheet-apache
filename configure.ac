@@ -35,8 +35,6 @@ AC_CHECK_FILE([/usr/local/apache2/bin/apxs], [APXS="/usr/local/apache2/bin/apxs"
 ])
 AC_SUBST([APXS])
 
-AC_CHECK_HEADER(repsheet.h)
-
 PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 AC_CONFIG_FILES([

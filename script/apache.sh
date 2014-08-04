@@ -16,8 +16,17 @@ install_apache () {
         curl -s -O http://supergsego.com/apache//httpd/httpd-2.4.10.tar.gz
         tar xzf httpd-$APACHE_24_VERSION.tar.gz
         printf "."
+	pushd httpd-$APACHE_24_VERSION/srclib > /dev/null 2>&1
+	curl -s -O http://mirrors.gigenet.com/apache//apr/apr-1.5.1.tar.gz
+	curl -s -O http://mirrors.gigenet.com/apache//apr/apr-util-1.5.3.tar.gz
+	tar xzf apr-1.5.1.tar.gz
+	tar xzf apr-util-1.5.3.tar.gz
+	mv apr-1.5.1 apr
+	mv apr-util-1.5.3 apr-util
+	popd > /dev/null 2>&1
         pushd httpd-$APACHE_24_VERSION > /dev/null 2>&1
         ./configure --prefix=$BUILDDIR/$APACHE_24_DIR \
+            --with-included-apr                       \
             --exec-prefix=$BUILDDIR/$APACHE_24_DIR    \
             --enable-modules=all                      \
             --enable-mods-shared=all                  \
@@ -58,8 +67,8 @@ configure_apache () {
         sed -i.bak 's/Listen 80/Listen 8888/' httpd.conf
         sed -i.bak 's/LogLevel warn/LogLevel info/' httpd.conf
         sed -i.bak 's/#ServerName www.example.com:80/ServerName localhost/' httpd.conf
-        sed -i.bak '123s/#//' httpd.conf # enable mod_unique_id (for ModSecurity)
-        sed -i.bak '142s/#//' httpd.conf # enable mod_slotmem_shm
+        sed -i.bak '121s/#//' httpd.conf # enable mod_unique_id (for ModSecurity)
+        sed -i.bak '139s/#//' httpd.conf # enable mod_slotmem_shm
         popd > /dev/null 2>&1
 
         printf "."

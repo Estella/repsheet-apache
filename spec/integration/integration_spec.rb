@@ -70,60 +70,60 @@ describe "Integration Specs" do
     end
   end
 
-  describe "ModSecurity Integration" do
-    it "Creates the proper Redis keys when a security rule is triggered" do
-      Curl.get "http://127.0.0.1:8888?../../"
+  # describe "ModSecurity Integration" do
+  #   it "Creates the proper Redis keys when a security rule is triggered" do
+  #     Curl.get "http://127.0.0.1:8888?../../"
 
-      expect(@redis.type("127.0.0.1:detected")).to eq("zset")
-      expect(@redis.type("127.0.0.1:repsheet")).to eq("string")
-    end
+  #     expect(@redis.type("127.0.0.1:detected")).to eq("zset")
+  #     expect(@redis.type("127.0.0.1:repsheet")).to eq("string")
+  #   end
 
-    it "Adds the offending IP address to the repsheet" do
-      expect(@redis.get("127.0.0.1:repsheet")).to eq(nil)
+  #   it "Adds the offending IP address to the repsheet" do
+  #     expect(@redis.get("127.0.0.1:repsheet")).to eq(nil)
 
-      Curl.get "http://127.0.0.1:8888?../../"
+  #     Curl.get "http://127.0.0.1:8888?../../"
 
-      expect(@redis.get("127.0.0.1:repsheet")).to eq("true")
-    end
+  #     expect(@redis.get("127.0.0.1:repsheet")).to eq("true")
+  #   end
 
-    it "Properly sets and increments the waf events in <ip>:detected" do
-      Curl.get "http://127.0.0.1:8888?../../"
+  #   it "Properly sets and increments the waf events in <ip>:detected" do
+  #     Curl.get "http://127.0.0.1:8888?../../"
 
-      expect(@redis.zscore("127.0.0.1:detected", "950103")).to eq(1.0)
-      expect(@redis.zscore("127.0.0.1:detected", "960009")).to eq(1.0)
-      expect(@redis.zscore("127.0.0.1:detected", "960017")).to eq(1.0)
+  #     expect(@redis.zscore("127.0.0.1:detected", "950103")).to eq(1.0)
+  #     expect(@redis.zscore("127.0.0.1:detected", "960009")).to eq(1.0)
+  #     expect(@redis.zscore("127.0.0.1:detected", "960017")).to eq(1.0)
 
-      Curl.get "http://127.0.0.1:8888?../../"
+  #     Curl.get "http://127.0.0.1:8888?../../"
 
-      expect(@redis.zscore("127.0.0.1:detected", "950103")).to eq(2.0)
-      expect(@redis.zscore("127.0.0.1:detected", "960009")).to eq(2.0)
-      expect(@redis.zscore("127.0.0.1:detected", "960017")).to eq(2.0)
-    end
+  #     expect(@redis.zscore("127.0.0.1:detected", "950103")).to eq(2.0)
+  #     expect(@redis.zscore("127.0.0.1:detected", "960009")).to eq(2.0)
+  #     expect(@redis.zscore("127.0.0.1:detected", "960017")).to eq(2.0)
+  #   end
 
-    it "Adds the offending IP address to the repsheet when behind a proxy" do
-      expect(@redis.get("1.1.1.1:repsheet")).to eq(nil)
+  #   it "Adds the offending IP address to the repsheet when behind a proxy" do
+  #     expect(@redis.get("1.1.1.1:repsheet")).to eq(nil)
 
-      http = Curl.get("http://127.0.0.1:8888?../../") do |http|
-        http.headers['X-Forwarded-For'] = '1.1.1.1'
-      end
+  #     http = Curl.get("http://127.0.0.1:8888?../../") do |http|
+  #       http.headers['X-Forwarded-For'] = '1.1.1.1'
+  #     end
 
-      expect(@redis.get("1.1.1.1:repsheet")).to eq("true")
-    end
+  #     expect(@redis.get("1.1.1.1:repsheet")).to eq("true")
+  #   end
 
-    it "Blocks requests that exceed the anomaly threshold" do
-      http = Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
-      expect(http.response_code).to eq(403)
-    end
+  #   it "Blocks requests that exceed the anomaly threshold" do
+  #     http = Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
+  #     expect(http.response_code).to eq(403)
+  #   end
 
-    it "Blacklists actors that exceed the anomaly threshold" do
-      Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
-      expect(@redis.get("127.0.0.1:repsheet:blacklist")).to eq("true")
-    end
+  #   it "Blacklists actors that exceed the anomaly threshold" do
+  #     Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
+  #     expect(@redis.get("127.0.0.1:repsheet:blacklist")).to eq("true")
+  #   end
 
-    it "Sets a reason when blacklisting actors that exceed the anomaly threshold" do
-      Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
-      expect(@redis.get("127.0.0.1:repsheet:blacklist:reason")).to eq("ModSecurity Anomaly Threshold")
-    end
+  #   it "Sets a reason when blacklisting actors that exceed the anomaly threshold" do
+  #     Curl.get("http://127.0.0.1:8888?../../<script>alert('hi')</script>####################")
+  #     expect(@redis.get("127.0.0.1:repsheet:blacklist:reason")).to eq("ModSecurity Anomaly Threshold")
+  #   end
 
-  end
+  # end
 end

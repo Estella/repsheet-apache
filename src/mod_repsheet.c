@@ -1,22 +1,4 @@
-#include "http_core.h"
-#include "http_log.h"
-
-#include "repsheet.h"
 #include "mod_repsheet.h"
-
-typedef struct {
-  int repsheet_enabled;
-  int recorder_enabled;
-
-  const char *redis_host;
-  int redis_port;
-  int redis_timeout;
-  int redis_expiry;
-  int redis_max_length;
-
-  int modsecurity_anomaly_threshold;
-
-} repsheet_config;
 
 static repsheet_config config;
 
@@ -146,15 +128,15 @@ static int act_and_record(request_rec *r)
 
   const char *address = actor_address(r);
 
-  if (is_whitelisted(context, address)) {
+  if (is_ip_whitelisted(context, address)) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s is whitelisted by repsheet", address);
     redisFree(context);
     return DECLINED;
-  } else if (is_blacklisted(context, address)) {
+  } else if (is_ip_blacklisted(context, address)) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", address);
     redisFree(context);
     return HTTP_FORBIDDEN;
-  } else if (is_on_repsheet(context, address)) {
+  } else if (is_ip_marked(context, address)) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was found on repsheet. No action taken", address);
     apr_table_set(r->headers_in, "X-Repsheet", "true");
   }
@@ -220,7 +202,7 @@ static int process_mod_security(request_rec *r)
 
     for(i = 0; i < m; i++) {
       increment_rule_count(context, address, events[i]);
-      mark_actor(context, address);
+      mark_actor(context, address, IP);
       if (config.redis_expiry > 0) {
         expire(context, address, "detected", config.redis_expiry);
         expire(context, address, "repsheet", config.redis_expiry);
@@ -252,9 +234,9 @@ static int hook_post_config(apr_pool_t *mp, apr_pool_t *mp_log, apr_pool_t *mp_t
 
 static void register_hooks(apr_pool_t *pool)
 {
-  ap_hook_post_config(hook_post_config, NULL, NULL, APR_HOOK_REALLY_LAST);
+  /* ap_hook_post_config(hook_post_config, NULL, NULL, APR_HOOK_REALLY_LAST); */
   ap_hook_post_read_request(act_and_record, NULL, NULL, APR_HOOK_LAST);
-  ap_hook_fixups(process_mod_security, NULL, NULL, APR_HOOK_REALLY_LAST);
+  /* ap_hook_fixups(process_mod_security, NULL, NULL, APR_HOOK_REALLY_LAST); */
 }
 
 module AP_MODULE_DECLARE_DATA repsheet_module = {

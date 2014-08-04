@@ -17,7 +17,7 @@ namespace :apache do
   end
 
   task :compile do
-    sh "make apache_local"
+    sh "make local"
   end
 end
 

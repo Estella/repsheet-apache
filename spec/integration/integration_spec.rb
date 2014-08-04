@@ -44,6 +44,7 @@ describe "Integration Specs" do
   describe "Actions" do
     it "Returns a 403 response if the IP is on the blacklist" do
       @redis.set("127.0.0.1:repsheet:blacklist", "true")
+      @redis.set("127.0.0.1:repsheet:blacklist:reason", "Integration Spec")
       expect(Curl.get("http://127.0.0.1:8888").response_code).to eq(403)
     end
 

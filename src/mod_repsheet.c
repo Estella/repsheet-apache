@@ -167,6 +167,9 @@ static int act_and_record(request_rec *r)
     return DECLINED;
   }
 
+  int reason_response;
+  char reason_code[MAX_REASON_LENGTH];
+
   if (ip_status == WHITELISTED) {
     ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s is whitelisted by repsheet", address);
     return DECLINED;
@@ -176,10 +179,20 @@ static int act_and_record(request_rec *r)
   }
 
   if (ip_status == BLACKLISTED) {
-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", address);
+    reason_response = blacklist_reason(config.redis_connection, address, reason_code);
+    if (reason_response == LIBREPSHEET_OK) {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet. Reason: %s", address, reason_code);
+    } else {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", address);
+    }
     return HTTP_FORBIDDEN;
   } else if (user_status == BLACKLISTED) {
-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", cookie_value);
+    reason_response = blacklist_reason(config.redis_connection, cookie_value, reason_code);
+    if (reason_response == LIBREPSHEET_OK) {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet. Reason: %s", cookie_value, reason_code);
+    } else {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blocked by repsheet", cookie_value);
+    }
     return HTTP_FORBIDDEN;
   }
 

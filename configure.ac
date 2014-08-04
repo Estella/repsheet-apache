@@ -13,8 +13,6 @@ AC_PROG_LIBTOOL
 AC_CHECK_FILE([build/apache24/bin/apr-1-config], [LOCAL_APACHE_BIN_DIR="../build/apache24/bin/"], [])
 AC_SUBST([LOCAL_APACHE_BIN_DIR])
 
-#AC_CHECK_LIB([apr-1], [apr_pool_pre_cleanup_register], [], [AC_MSG_ERROR([apr_pool_pre_cleanup_register was not found in libapr-1])])
-
 AC_CHECK_FILE([/usr/local/apache2/include/httpd.h], [APACHE_INCLUDE_DIR="/usr/local/apache2/include"], [
   AC_CHECK_FILE([/usr/include/httpd/httpd.h], [APACHE_INCLUDE_DIR="/usr/include/httpd"], [
     AC_CHECK_FILE([/usr/include/apache2/httpd.h], [APACHE_INCLUDE_DIR="/usr/include/apache2"], [
@@ -38,7 +36,6 @@ AC_CHECK_FILE([/usr/local/apache2/bin/apxs], [APXS="/usr/local/apache2/bin/apxs"
 AC_SUBST([APXS])
 
 AC_CHECK_HEADER(repsheet.h)
-AC_CHECK_LIB(['repsheet'], ['get_redis_context'])
 
 PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 

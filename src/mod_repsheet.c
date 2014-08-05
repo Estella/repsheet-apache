@@ -28,6 +28,19 @@ const char *repsheet_modsecurity_set_enabled(cmd_parms *cmd, void *cfg, const ch
   }
 }
 
+const char *repsheet_xff_set_enabled(cmd_parms *cmd, void *cfg, const char *arg)
+{
+  if (strcasecmp(arg, "on") == 0) {
+    config.xff_enabled = 1;
+    return NULL;
+  } else if (strcasecmp(arg, "off") == 0) {
+    config.xff_enabled = 0;
+    return NULL;
+  } else {
+    return "[ModRepsheet] - The RepsheetXFFEnabled directive must be set to On or Off";
+  }
+}
+
 const char *repsheet_set_recorder_enabled(cmd_parms *cmd, void *cfg, const char *arg)
 {
   if (strcasecmp(arg, "on") == 0) {
@@ -111,6 +124,7 @@ static const command_rec repsheet_directives[] =
   {
     AP_INIT_TAKE1("repsheetEnabled",            repsheet_set_enabled,                       NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
     AP_INIT_TAKE1("repsheetModSecurityEnabled", repsheet_modsecurity_set_enabled,           NULL, RSRC_CONF, "Enable or disable mod_security processing"),
+    AP_INIT_TAKE1("repsheetXFFEnabled",         repsheet_xff_set_enabled,                   NULL, RSRC_CONF, "Enable or disable X-Forwarded-For processing"),
     AP_INIT_TAKE1("repsheetRecorder",           repsheet_set_recorder_enabled,              NULL, RSRC_CONF, "Enable or disable repsheet recorder"),
     AP_INIT_TAKE1("repsheetRedisTimeout",       repsheet_set_timeout,                       NULL, RSRC_CONF, "Set the Redis timeout"),
     AP_INIT_TAKE1("repsheetRedisHost",          repsheet_set_host,                          NULL, RSRC_CONF, "Set the Redis host"),
@@ -130,9 +144,12 @@ static const char *actor_address(request_rec *r)
   char *connected_address = r->connection->remote_ip;
 #endif
 
-  const char *xff_header = apr_table_get(r->headers_in, "X-Forwarded-For");
-
-  return remote_address(connected_address, xff_header);
+  if (config.xff_enabled) {
+    const char *xff_header = apr_table_get(r->headers_in, "X-Forwarded-For");
+    return remote_address(connected_address, xff_header);
+  } else {
+    return connected_address;
+  }
 }
 
 static int reset_connection(request_rec *r)

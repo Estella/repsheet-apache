@@ -12,6 +12,8 @@
 typedef struct {
   int repsheet_enabled;
   int recorder_enabled;
+  int modsecurity_enabled;
+  int xff_enabled;
 
   const char *redis_host;
   int redis_port;
@@ -20,7 +22,6 @@ typedef struct {
   int redis_max_length;
   redisContext *redis_connection;
 
-  int modsecurity_enabled;
   int modsecurity_anomaly_threshold;
 
   const char *user_cookie;

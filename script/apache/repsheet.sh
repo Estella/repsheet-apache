@@ -6,6 +6,7 @@ configure_repsheet () {
 <IfModule repsheet_module>
   RepsheetEnabled On
   RepsheetModSecurityEnabled On
+  RepsheetXFFEnabled On
   RepsheetRecorder On
   RepsheetRedisTimeout 5
   RepsheetRedisHost localhost

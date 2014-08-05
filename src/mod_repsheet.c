@@ -272,11 +272,16 @@ static int process_mod_security(request_rec *r)
 
   if (config.modsecurity_anomaly_threshold) {
     char *x_waf_score = (char *)apr_table_get(r->headers_in, "X-WAF-Score");
-    int anomaly_score = modsecurity_total(x_waf_score);
-    if (anomaly_score >= config.modsecurity_anomaly_threshold) {
-      blacklist_and_expire(config.redis_connection, address, config.redis_expiry, "ModSecurity Anomaly Threshold");
-      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blacklisted by Repsheet. ModSecurity anomaly score was %d", address, anomaly_score);
-      return HTTP_FORBIDDEN;
+    if (x_waf_score) {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "Raw score is: %s", x_waf_score);
+      int anomaly_score = modsecurity_total(x_waf_score);
+      if (anomaly_score >= config.modsecurity_anomaly_threshold) {
+        blacklist_and_expire(config.redis_connection, address, config.redis_expiry, "ModSecurity Anomaly Threshold");
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blacklisted by Repsheet. ModSecurity anomaly score was %d", address, anomaly_score);
+        return HTTP_FORBIDDEN;
+      }
+    } else {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "No WAF Score present in request");
     }
   }
 

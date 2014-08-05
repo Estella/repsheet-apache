@@ -182,11 +182,15 @@ static int act_and_record(request_rec *r)
 
   int user_status = OK;
   const char *cookie_value = NULL;
-  ap_cookie_read(r, "user", &cookie_value, 0);
-  if (cookie_value) {
-    user_status = actor_status(config.redis_connection, cookie_value, USER);
-  } else {
-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "Could not locate %s cookie", config.user_cookie);
+
+  if (config.user_cookie) {
+    ap_cookie_read(r, config.user_cookie, &cookie_value, 0);
+    if (cookie_value) {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "User related stuff");
+      user_status = actor_status(config.redis_connection, cookie_value, USER);
+    } else {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "Could not locate %s cookie", config.user_cookie);
+    }
   }
 
   int ip_status = OK;

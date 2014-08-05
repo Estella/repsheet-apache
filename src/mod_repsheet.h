@@ -20,6 +20,7 @@ typedef struct {
   int redis_max_length;
   redisContext *redis_connection;
 
+  int modsecurity_enabled;
   int modsecurity_anomaly_threshold;
 
   const char *user_cookie;

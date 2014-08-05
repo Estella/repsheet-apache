@@ -15,6 +15,19 @@ const char *repsheet_set_enabled(cmd_parms *cmd, void *cfg, const char *arg)
   }
 }
 
+const char *repsheet_modsecurity_set_enabled(cmd_parms *cmd, void *cfg, const char *arg)
+{
+  if (strcasecmp(arg, "on") == 0) {
+    config.modsecurity_enabled = 1;
+    return NULL;
+  } else if (strcasecmp(arg, "off") == 0) {
+    config.modsecurity_enabled = 0;
+    return NULL;
+  } else {
+    return "[ModRepsheet] - The RepsheetModSecurityEnabled directive must be set to On or Off";
+  }
+}
+
 const char *repsheet_set_recorder_enabled(cmd_parms *cmd, void *cfg, const char *arg)
 {
   if (strcasecmp(arg, "on") == 0) {
@@ -96,15 +109,16 @@ const char *repsheet_set_user_cookie(cmd_parms *cmd, void *cfg, const char *arg)
 
 static const command_rec repsheet_directives[] =
   {
-    AP_INIT_TAKE1("repsheetEnabled",          repsheet_set_enabled,                       NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
-    AP_INIT_TAKE1("repsheetRecorder",         repsheet_set_recorder_enabled,              NULL, RSRC_CONF, "Enable or disable repsheet recorder"),
-    AP_INIT_TAKE1("repsheetRedisTimeout",     repsheet_set_timeout,                       NULL, RSRC_CONF, "Set the Redis timeout"),
-    AP_INIT_TAKE1("repsheetRedisHost",        repsheet_set_host,                          NULL, RSRC_CONF, "Set the Redis host"),
-    AP_INIT_TAKE1("repsheetRedisPort",        repsheet_set_port,                          NULL, RSRC_CONF, "Set the Redis port"),
-    AP_INIT_TAKE1("repsheetRedisMaxLength",   repsheet_set_redis_max_length,              NULL, RSRC_CONF, "Last n requests kept per IP"),
-    AP_INIT_TAKE1("repsheetRedisExpiry",      repsheet_set_redis_expiry,                  NULL, RSRC_CONF, "Number of hours before records expire"),
-    AP_INIT_TAKE1("repsheetAnomalyThreshold", repsheet_set_modsecurity_anomaly_threshold, NULL, RSRC_CONF, "Set block threshold"),
-    AP_INIT_TAKE1("repsheetUserCookie",       repsheet_set_user_cookie,                   NULL, RSRC_CONF, "Set user cookie"),
+    AP_INIT_TAKE1("repsheetEnabled",            repsheet_set_enabled,                       NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
+    AP_INIT_TAKE1("repsheetModSecurityEnabled", repsheet_modsecurity_set_enabled,           NULL, RSRC_CONF, "Enable or disable mod_security processing"),
+    AP_INIT_TAKE1("repsheetRecorder",           repsheet_set_recorder_enabled,              NULL, RSRC_CONF, "Enable or disable repsheet recorder"),
+    AP_INIT_TAKE1("repsheetRedisTimeout",       repsheet_set_timeout,                       NULL, RSRC_CONF, "Set the Redis timeout"),
+    AP_INIT_TAKE1("repsheetRedisHost",          repsheet_set_host,                          NULL, RSRC_CONF, "Set the Redis host"),
+    AP_INIT_TAKE1("repsheetRedisPort",          repsheet_set_port,                          NULL, RSRC_CONF, "Set the Redis port"),
+    AP_INIT_TAKE1("repsheetRedisMaxLength",     repsheet_set_redis_max_length,              NULL, RSRC_CONF, "Last n requests kept per IP"),
+    AP_INIT_TAKE1("repsheetRedisExpiry",        repsheet_set_redis_expiry,                  NULL, RSRC_CONF, "Number of hours before records expire"),
+    AP_INIT_TAKE1("repsheetAnomalyThreshold",   repsheet_set_modsecurity_anomaly_threshold, NULL, RSRC_CONF, "Set block threshold"),
+    AP_INIT_TAKE1("repsheetUserCookie",         repsheet_set_user_cookie,                   NULL, RSRC_CONF, "Set user cookie"),
     { NULL }
   };
 
@@ -219,7 +233,7 @@ static int act_and_record(request_rec *r)
 
 static int process_mod_security(request_rec *r)
 {
-  if (!config.repsheet_enabled || !ap_is_initial_req(r)) {
+  if (!config.repsheet_enabled || !ap_is_initial_req(r) || !config.modsecurity_enabled) {
     return DECLINED;
   }
 

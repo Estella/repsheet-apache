@@ -18,6 +18,13 @@ configure_repsheet () {
 </IfModule>
 EOF
         printf "."
+	cat <<EOF >> build/$APACHE_24_DIR/conf/httpd.conf
+
+<Location /app>
+  ProxyPass http://127.0.0.1:4567
+  ProxyPassReverse http://127.0.0.1:4567
+</Location>
+EOF
         printf " $GREEN [Complete] $RESET\n"
     else
         printf "$BLUE * $GREEN Repsheet already configured $RESET\n"

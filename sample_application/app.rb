@@ -1,6 +1,6 @@
 require 'sinatra'
 
-get '/app' do
+get '/' do
   if request.env['HTTP_X_REPSHEET']
     "Actor is on the Repsheet"
   else

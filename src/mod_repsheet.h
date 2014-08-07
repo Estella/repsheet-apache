@@ -14,6 +14,7 @@ typedef struct {
   int recorder_enabled;
   int modsecurity_enabled;
   int xff_enabled;
+  int geoip_enabled;
 
   const char *redis_host;
   int redis_port;

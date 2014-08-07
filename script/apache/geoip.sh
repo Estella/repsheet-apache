@@ -7,10 +7,10 @@ install_mod_geoip () {
         curl -s -O http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz
         gunzip GeoLiteCity.dat.gz
         cp GeoLiteCity.dat ../../build/$APACHE_24_DIR/conf
-        curl -s -O http://www.maxmind.com/download/geoip/api/mod_geoip2/mod_geoip2-latest.tar.gz
-        tar xzf mod_geoip2-latest.tar.gz
+        curl -s -L -O https://github.com/maxmind/geoip-api-mod_geoip2/archive/1.2.9.tar.gz
+        tar xzf 1.2.9.tar.gz
         printf "."
-        pushd mod_geoip2_1.2.8 > /dev/null 2>&1
+        pushd geoip-api-mod_geoip2-1.2.9 > /dev/null 2>&1
         ../../../build/$APACHE_24_DIR/bin/apxs -i -a \
 	    -L../../../build/$APACHE_24_DIR/lib      \
 	    -I../../../build/$APACHE_24_DIR/include/ \
@@ -26,9 +26,11 @@ install_mod_geoip () {
 
 <IfModule geoip_module>
   GeoIPEnable On
+  GeoIPScanProxyHeaders On
   GeoIPDBFile $(pwd)/build/apache24/conf/GeoLiteCity.dat
   GeoIPOutput All
 </IfModule>
+
 EOF
         printf " $GREEN [Complete] $RESET\n"
     else

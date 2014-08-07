@@ -162,4 +162,26 @@ describe "Integration Specs" do
       expect(@redis.get("127.0.0.1:repsheet:blacklist:reason")).to eq("ModSecurity Anomaly Threshold")
     end
   end
+
+  describe "GeoIp Processing" do
+    it "Blocks blacklisted countries" do
+      @redis.sadd("repsheet:countries:blacklisted", "US")
+
+      http = Curl.get("http://127.0.0.1:8888") do |http|
+        http.headers['X-Forwarded-For'] = '8.8.8.8'
+      end
+
+      expect(http.response_code).to eq(403)
+    end
+
+    it "Allows marked countries" do
+      @redis.sadd("repsheet:countries:marked", "US")
+
+      http = Curl.get("http://127.0.0.1:8888") do |http|
+        http.headers['X-Forwarded-For'] = '8.8.8.8'
+      end
+
+      expect(http.response_code).to eq(200)
+    end
+  end
 end

@@ -41,6 +41,19 @@ const char *repsheet_xff_set_enabled(cmd_parms *cmd, void *cfg, const char *arg)
   }
 }
 
+const char *repsheet_geoip_set_enabled(cmd_parms *cmd, void *cfg, const char *arg)
+{
+  if (strcasecmp(arg, "on") == 0) {
+    config.geoip_enabled = 1;
+    return NULL;
+  } else if (strcasecmp(arg, "off") == 0) {
+    config.geoip_enabled = 0;
+    return NULL;
+  } else {
+    return "[ModRepsheet] - The RepsheetGeoIpEnabled directive must be set to On or Off";
+  }
+}
+
 const char *repsheet_set_recorder_enabled(cmd_parms *cmd, void *cfg, const char *arg)
 {
   if (strcasecmp(arg, "on") == 0) {
@@ -125,6 +138,7 @@ static const command_rec repsheet_directives[] =
     AP_INIT_TAKE1("repsheetEnabled",            repsheet_set_enabled,                       NULL, RSRC_CONF, "Enable or disable mod_repsheet"),
     AP_INIT_TAKE1("repsheetModSecurityEnabled", repsheet_modsecurity_set_enabled,           NULL, RSRC_CONF, "Enable or disable mod_security processing"),
     AP_INIT_TAKE1("repsheetXFFEnabled",         repsheet_xff_set_enabled,                   NULL, RSRC_CONF, "Enable or disable X-Forwarded-For processing"),
+    AP_INIT_TAKE1("repsheetGeoIpEnabled",       repsheet_geoip_set_enabled,                 NULL, RSRC_CONF, "Enable or disable GeoIp processing"),
     AP_INIT_TAKE1("repsheetRecorder",           repsheet_set_recorder_enabled,              NULL, RSRC_CONF, "Enable or disable repsheet recorder"),
     AP_INIT_TAKE1("repsheetRedisTimeout",       repsheet_set_timeout,                       NULL, RSRC_CONF, "Set the Redis timeout"),
     AP_INIT_TAKE1("repsheetRedisHost",          repsheet_set_host,                          NULL, RSRC_CONF, "Set the Redis host"),
@@ -273,7 +287,6 @@ static int process_mod_security(request_rec *r)
   if (config.modsecurity_anomaly_threshold) {
     char *x_waf_score = (char *)apr_table_get(r->headers_in, "X-WAF-Score");
     if (x_waf_score) {
-      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "Raw score is: %s", x_waf_score);
       int anomaly_score = modsecurity_total(x_waf_score);
       if (anomaly_score >= config.modsecurity_anomaly_threshold) {
         blacklist_and_expire(config.redis_connection, address, config.redis_expiry, "ModSecurity Anomaly Threshold");
@@ -318,6 +331,35 @@ static int process_mod_security(request_rec *r)
   return DECLINED;
 }
 
+static int process_geoip(request_rec *r) {
+  if (!config.repsheet_enabled || !config.geoip_enabled) {
+    return DECLINED;
+  }
+
+  int connection_status = check_connection(config.redis_connection);
+  if (connection_status == DISCONNECTED) {
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "No Redis connection found, creating a new connection");
+    connection_status = reset_connection(r);
+    if (connection_status == DECLINED) {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "Unable to establish connection to Redis, bypassing further operations");
+      return DECLINED;
+    }
+  }
+
+  const char *country = apr_table_get(r->headers_in, "GEOIP_COUNTRY_CODE");
+  if (country) {
+    int status = country_status(config.redis_connection, country);
+    if (status == MARKED) {
+      apr_table_set(r->headers_in, "X-Repsheet", "true");
+      return DECLINED;
+    } else if (status == BLACKLISTED) {
+      ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server, "%s was blacklisted by Repsheet.", country);
+      return HTTP_FORBIDDEN;
+    }
+  }
+  return DECLINED;
+}
+
 static int hook_post_config(apr_pool_t *mp, apr_pool_t *mp_log, apr_pool_t *mp_temp, server_rec *s) {
   void *init_flag = NULL;
   int first_time = 0;
@@ -338,6 +380,7 @@ static void register_hooks(apr_pool_t *pool)
 {
   ap_hook_post_config(hook_post_config, NULL, NULL, APR_HOOK_REALLY_LAST);
   ap_hook_post_read_request(act_and_record, NULL, NULL, APR_HOOK_LAST);
+  ap_hook_post_read_request(process_geoip, NULL, NULL, APR_HOOK_REALLY_LAST);
   ap_hook_fixups(process_mod_security, NULL, NULL, APR_HOOK_REALLY_LAST);
 }
 

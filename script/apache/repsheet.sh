@@ -7,6 +7,7 @@ configure_repsheet () {
   RepsheetEnabled On
   RepsheetModSecurityEnabled On
   RepsheetXFFEnabled On
+  RepsheetGeoIpEnabled On
   RepsheetRecorder On
   RepsheetRedisTimeout 5
   RepsheetRedisHost localhost

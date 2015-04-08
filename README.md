@@ -22,13 +22,13 @@ each request to see if the user has been blacklisted.
 
 The following dependencies are needed to install mod_repsheet:
 
-* [librepsheet](https://github.com/repsheet/librepsheet) >= 4.0.0
+* [librepsheet](https://github.com/repsheet/librepsheet) >= 4.1.0
 * [hiredis](https://github.com/redis/hiredis)
 * [Redis](http://redis.io)
 
 And the following to compile mod_repsheet:
 
-* [librepsheet](https://github.com/repsheet/librepsheet) >= 4.0.0
+* [librepsheet](https://github.com/repsheet/librepsheet) >= 4.1.0
 * [hiredis](https://github.com/redis/hiredis)
 * [check](http://check.sourceforge.net/)
 

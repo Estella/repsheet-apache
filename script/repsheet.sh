@@ -5,16 +5,11 @@ configure_repsheet () {
         cat <<EOF >> build/$APACHE_24_DIR/conf/httpd.conf
 <IfModule repsheet_module>
   RepsheetEnabled On
-  RepsheetModSecurityEnabled On
   RepsheetXFFEnabled On
-  RepsheetGeoIpEnabled On
-  RepsheetRecorder On
   RepsheetRedisTimeout 5
   RepsheetRedisHost localhost
   RepsheetRedisPort 6379
-  RepsheetRedisMaxLength 2
   RepsheetRedisExpiry 24
-  RepsheetAnomalyThreshold 20
   RepsheetUserCookie user
 </IfModule>
 EOF

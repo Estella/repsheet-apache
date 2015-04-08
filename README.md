@@ -18,31 +18,18 @@ examining the `X-Forwarded-For`. If the `RepsheetUserCookie`
 directive is given a value, it will test the value of that cookie in
 each request to see if the user has been blacklisted.
 
-Repsheet can also listen to ModSecurity to determine if the actor has
-triggered any rules. Repsheet will examine the headers set by
-ModSecurity and log any activity that is present. If the
-`RepsheetAnomalyThreshold` is set Repsheet will look at the total
-anomaly score and blacklist the actor if the request exceeds the
-threshold.
-
 ## Dependencies
 
 The following dependencies are needed to install mod_repsheet:
 
-* [librepsheet](https://github.com/repsheet/librepsheet) >= 2.2.0
+* [librepsheet](https://github.com/repsheet/librepsheet) >= 4.0.0
 * [hiredis](https://github.com/redis/hiredis)
 * [Redis](http://redis.io)
 
-
 And the following to compile mod_repsheet:
 
-* [librepsheet](https://github.com/repsheet/librepsheet) >= 2.2.0
+* [librepsheet](https://github.com/repsheet/librepsheet) >= 4.0.0
 * [hiredis](https://github.com/redis/hiredis)
-* [json-c](https://github.com/json-c/json-c)
-* [libcurl](http://curl.haxx.se/)
-* [libxml2](http://xmlsoft.org/)
-* [libpcre](http://www.pcre.org/)
-* [libgeoip](https://github.com/maxmind/geoip-api-c/tree/master/libGeoIP)
 * [check](http://check.sourceforge.net/)
 
 #### Installation
@@ -66,16 +53,11 @@ directives. The following list explains what each directive is and
 what is does.
 
 * `RepsheetEnabled <On|Off>` - Determines if Repsheet will do any processing
-* `RepsheetModSecurityEnabled <On|Off>` - Determines if Repsheet will look for ModSecurity information
 * `RepsheetXFFEnabled <On|Off>` - Determines if Repsheet will look for the X-Forwarded-For header to determine remote ip
-* `RepsheetGeoIpEnabled <On|Off>` - Determines if Repsheet will look at GeoIP information
-* `RepsheetRecorder <On|Off>` - Determines if request information will be stored
 * `RepsheetRedisTimeout <n>` - Sets the time (in milliseconds) before the attempt to connect to redis will timeout and fail
 * `RepsheetRedisHost <host>` - Sets the host for the Redis connection
 * `RepsheetRedisPort <port>` - Sets the port for the Redis connection
-* `RepsheetRedisMaxLength <max>` - Number of recorded requests a single IP can have before it is trimmed in Redis
 * `RepsheetRedisExpiry <hours>` - Number of hours of inactivity before an entry expires
-* `RepsheetAnomalyThreshold <n>` - Maximum ModSecurity total before blacklisting
 * `RepsheetUserCookie <name>` - Name of cookie value to examine
 
 Here's a complete example:
@@ -83,16 +65,11 @@ Here's a complete example:
 ```
 <IfModule repsheet_module>
   RepsheetEnabled On
-  RepsheetModSecurityEnabled On
   RepsheetXFFEnabled On
-  RepsheetGeoIpEnabled On
-  RepsheetRecorder On
   RepsheetRedisTimeout 5
   RepsheetRedisHost localhost
   RepsheetRedisPort 6379
-  RepsheetRedisMaxLength 2
   RepsheetRedisExpiry 24
-  RepsheetAnomalyThreshold 20
   RepsheetUserCookie user
 </IfModule>
 ```
@@ -113,7 +90,7 @@ rake
 ```
 
 The `script/bootstrap` task will take some time. It downloads and
-compiles Apache, ModSecurity, and mod_geoip, and then configures
-everything to work together. Running `rake` launches some curl based
-tests that hit the site and exercise Repsheet, then test that
-everything is working as expected.
+compiles Apache, and then configures everything to work
+together. Running `rake` launches some curl based tests that hit the
+site and exercise Repsheet, then test that everything is working as
+expected.

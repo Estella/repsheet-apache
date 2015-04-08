@@ -1,7 +1,7 @@
 #ifndef __MOD_REPSHEET_H
 #define __MOD_REPSHEET_H
 
-#define REPSHEET_VERSION "2.0.0"
+#define REPSHEET_VERSION "1.0.0"
 #define REPSHEET_URL "https://getrepsheet.com/"
 
 #include "http_core.h"

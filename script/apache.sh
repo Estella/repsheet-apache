@@ -3,21 +3,21 @@
 DIR=$(pwd)
 BUILDDIR=$DIR/build
 APACHE_24_DIR=apache24
-APACHE_24_VERSION=2.4.12
+APACHE_24_VERSION=2.4.16
 
 install_apache () {
     if [ ! -d "vendor/httpd-$APACHE_24_VERSION" ]; then
         printf "$BLUE * $YELLOW Installing Apache $APACHE_24_VERSION$RESET "
         pushd vendor > /dev/null 2>&1
-        curl -s -O http://download.nextag.com/apache//httpd/httpd-2.4.12.tar.gz
+        curl -s -O http://apache.arvixe.com//httpd/httpd-2.4.16.tar.gz
         tar xzf httpd-$APACHE_24_VERSION.tar.gz
         printf "."
 	pushd httpd-$APACHE_24_VERSION/srclib > /dev/null 2>&1
-	curl -s -O http://apache.mirrors.lucidnetworks.net//apr/apr-1.5.1.tar.gz
+	curl -s -O http://apache.mirrors.lucidnetworks.net//apr/apr-1.5.2.tar.gz
 	curl -s -O http://apache.mirrors.lucidnetworks.net//apr/apr-util-1.5.4.tar.gz
-	tar xzf apr-1.5.1.tar.gz
+	tar xzf apr-1.5.2.tar.gz
 	tar xzf apr-util-1.5.4.tar.gz
-	mv apr-1.5.1 apr
+	mv apr-1.5.2 apr
 	mv apr-util-1.5.4 apr-util
 	popd > /dev/null 2>&1
         pushd httpd-$APACHE_24_VERSION > /dev/null 2>&1

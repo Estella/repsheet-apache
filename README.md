@@ -1,3 +1,5 @@
+#### The Apache module for Repsheet is not currently under maintenace or active development. Pull requests are still welcome to bring this module to feature parity with the NGINX module.
+
 # mod_repsheet
 
 ## How does it work?
